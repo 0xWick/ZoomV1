@@ -38,7 +38,7 @@ contract Exchange is ERC20 {
             // Liquidity Ratio
             uint256 tokenAmount = (msg.value * tokenReserve) / EthReserve;
 
-            require(_tokenAmount >= tokenAmount, " Insufficient token Amount");
+            require(_tokenAmount >= tokenAmount, "insufficient token amount");
 
             // Get Token IERC-20 Instance
             IERC20 token = IERC20(tokenAddress);
@@ -112,7 +112,7 @@ contract Exchange is ERC20 {
 
         uint256 numerator = inputAmountWithFee * outputReserve;
 
-        uint256 denominator = (inputAmountWithFee * 100) + inputReserve;
+        uint256 denominator = (inputReserve * 100) + inputAmountWithFee;
 
         return numerator / denominator;
     }
@@ -159,7 +159,7 @@ contract Exchange is ERC20 {
         );
 
         // ? This value allows user to prevent extra slippage
-        require(_minTokens > tokensBought, "Insufficeint Output Amount");
+        require(tokensBought >= _minTokens, "Insufficeint Output Amount");
         // Send the Tokens to the caller
         IERC20(tokenAddress).transfer(msg.sender, tokensBought);
     }
