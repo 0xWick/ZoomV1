@@ -6,13 +6,31 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
+interface IFactory {
+  function getExchange(address _tokenAddress) external returns (address);
+}
+
+interface IExchange {
+    function ethToTokenSwap(uint256 _minTokens) external payable;
+
+    function ethToTokenTransfer(uint256 _minTokens, address _recipient)
+        external
+        payable;
+}
+
 contract Exchange is ERC20 {
     // * Connect with token Address
     address public tokenAddress;
 
+    // * Factory Contract
+    address public factoryAddress;
+
     constructor(address _token) ERC20("ZoomV1", "ZOOM") {
         require(_token != address(0), "Invalid Token Address");
+
         tokenAddress = _token;
+
+        factoryAddress = msg.sender;
     }
 
     // * Providing Liquidity to the Pool
@@ -146,8 +164,8 @@ contract Exchange is ERC20 {
         return etherAmount;
     }
 
-    // ? Swapping Functions
-    function ethToTokenSwap(uint256 _minTokens) public payable {
+    // ? Underlying Swapping Functions
+    function ethToToken(uint256 _minTokens, address _recipient) private {
         // Get Token Reserve
         uint256 tokenReserve = getReserve();
 
@@ -161,9 +179,16 @@ contract Exchange is ERC20 {
         // ? This value allows user to prevent extra slippage
         require(tokensBought >= _minTokens, "Insufficeint Output Amount");
         // Send the Tokens to the caller
-        IERC20(tokenAddress).transfer(msg.sender, tokensBought);
+        IERC20(tokenAddress).transfer(_recipient, tokensBought);
     }
 
+    // * Ether to Token Swap
+    // * Swap Function
+    function ethToTokenSwap(uint256 _minTokens) public payable {
+        ethToToken(_minTokens, msg.sender);
+    }
+
+    // * Token to Ether Swap
     function tokenToEthSwap(uint256 _tokensSold, uint256 _minEth) public {
         // Get Token Reserve
         uint256 tokenReserve = getReserve();
@@ -185,5 +210,44 @@ contract Exchange is ERC20 {
 
         // Send Ether to the Caller
         payable(msg.sender).transfer(ethBought);
+    }
+
+    // * For Token to Token Swap
+    // ? Using Custom Recipient
+    function ethToTokenTransfer(uint256 _minTokens, address _recipient) public payable {
+        ethToToken(_minTokens, _recipient);
+    }
+
+    // * Swapping Tokens for Tokens
+    function tokenToTokenSwap(
+        uint256 _tokensSold,
+        uint256 _minTokensBought,
+        address _tokenAddress
+    ) public {
+
+        address exchangeAddress = IFactory(factoryAddress).getExchange(_tokenAddress);
+
+        require(exchangeAddress != address(this) && exchangeAddress != address(0), "Invalid Exchange Address");
+
+        // * Normal Token to Eth Procedure
+        uint256 tokenReserve = getReserve();
+
+        uint256 ethBought = getAmount(
+            _tokensSold,
+            tokenReserve,
+            address(this).balance
+        );
+
+        // * Tokens received from User
+        IERC20(tokenAddress).transferFrom(
+            msg.sender,
+            address(this),
+            _tokensSold
+        );
+
+        // * Send the Ether to the Other Token's Exchange
+        IExchange(exchangeAddress).ethToTokenTransfer{value: ethBought}(_minTokensBought, msg.sender);
+
+
     }
 }
