@@ -32,6 +32,9 @@ contract Factory {
         return address(exchange);
     }
 
+
+    // ? Interfaces don’t allow to access state variables and
+    // ? this is why we’ve implemented the getExchange function
     function getExchange(address _tokenAddress) public view returns(address) {
         return tokenToExchange[_tokenAddress];
     }
